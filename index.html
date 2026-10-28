@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StudyClock">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>StudyClock</title>
+<style>
+:root{--bg:#000;--fg:#f5f5f7;--mid:#8e8e93;--dim:#48484a;--line:rgba(255,255,255,.1);--card:rgba(255,255,255,.07);--acc:#ff9f0a;--ok:#30d158;--bad:#ff453a;
+--t:env(safe-area-inset-top,0px);--b:env(safe-area-inset-bottom,0px);--l:env(safe-area-inset-left,0px);--r:env(safe-area-inset-right,0px)}
+:root[data-theme=midnight]{--bg:#0a0e17;--card:rgba(150,180,255,.09);--acc:#64d2ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--fg);overflow:hidden;font-family:-apple-system,"SF Pro Display","Hiragino Sans",system-ui,sans-serif;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+.view{position:absolute;inset:0;padding:calc(var(--t) + 20px) calc(var(--r) + 20px) calc(var(--b) + 76px) calc(var(--l) + 20px);overflow-y:auto;opacity:0;visibility:hidden;transition:opacity .3s}
+.view.on{opacity:1;visibility:visible}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+/* clock */
+#v-clock{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;padding-bottom:calc(var(--b) + 20px)}
+#time{font-size:min(24vw,48vh);font-weight:200;letter-spacing:-.03em;line-height:1;display:flex;align-items:baseline;justify-content:center}
+#sec{font-size:.36em;color:var(--mid);width:1.25em;text-align:left;margin-left:.08em;font-weight:300;letter-spacing:0}
+.nosec #sec{display:none}
+#date{margin-top:2.2vh;font-size:clamp(16px,3.2vh + 1vw,28px);color:var(--mid);font-weight:400;letter-spacing:.02em}
+#today{margin-top:3vh;font-size:15px;color:var(--dim);transition:color .3s}
+#today b{color:var(--mid);font-weight:500}
+#quick{margin-top:4vh;height:48px;padding:0 26px;border-radius:24px;background:var(--card);font-size:16px;font-weight:600;transition:opacity .4s,background .2s}
+#quick:active{background:rgba(255,255,255,.16)}
+.hide #quick,.hide #nav{opacity:0;pointer-events:none}
+@media(orientation:landscape) and (max-height:500px){#v-clock{padding-bottom:calc(var(--b) + 64px)}#time{font-size:min(26vw,40vh)}#today{margin-top:1.5vh}#quick{margin-top:2vh;height:40px}#date{margin-top:1vh}#nav{bottom:calc(var(--b) + 6px)}#nav button{height:34px;padding:0 12px}}
+/* nav */
+#nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--b) + 12px);display:flex;gap:2px;padding:4px;border-radius:24px;background:rgba(40,40,44,.72);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border:.5px solid var(--line);transition:opacity .4s;z-index:9}
+#nav button{height:40px;padding:0 14px;white-space:nowrap;border-radius:20px;font-size:14px;font-weight:500;color:var(--mid);transition:.2s}
+#nav button.on{background:rgba(255,255,255,.14);color:var(--fg)}
+/* shared */
+h1{font-size:32px;font-weight:700;letter-spacing:-.02em;margin:8px 0 18px}
+h2{font-size:13px;font-weight:500;color:var(--mid);margin:26px 4px 8px;text-transform:none}
+.card{background:var(--card);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:6px 16px;gap:12px;font-size:16px;width:100%;text-align:left}
+.row+.row{border-top:.5px solid var(--line)}
+.row small{display:block;color:var(--mid);font-size:12.5px;margin-top:2px;line-height:1.4;font-weight:400}
+.mid{color:var(--mid)}
+.sw{position:relative;width:51px;height:31px;border-radius:16px;background:#39393d;flex:none;transition:.25s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:.25s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.sw.on{background:var(--ok)}.sw.on::after{left:22px}
+select,input{font:inherit;color:var(--fg);background:transparent;border:0;outline:0;text-align:right;max-width:55%}
+select{color:var(--mid);-webkit-appearance:none;appearance:none}
+option{color:#000}
+.seg{display:flex;background:var(--card);border-radius:10px;padding:2px;margin-bottom:16px}
+.seg button{flex:1;height:34px;border-radius:8px;font-size:14px;font-weight:500;color:var(--mid)}
+.seg button.on{background:rgba(255,255,255,.16);color:var(--fg)}
+.empty{padding:34px 20px;text-align:center;color:var(--mid);font-size:15px;line-height:1.6}
+.link{color:var(--acc)}.bad{color:var(--bad)}
+/* timer */
+#v-timer{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+#tstate{font-size:14px;color:var(--mid);letter-spacing:.08em;height:20px}
+#tstate.run{color:var(--acc)}
+#tel{font-size:min(21vw,34vh);font-weight:200;letter-spacing:-.03em;line-height:1.05;margin:1vh 0}
+#tgoal{height:4px;width:min(60vw,320px);border-radius:2px;background:var(--line);overflow:hidden;margin:0 auto 2vh;opacity:0;transition:opacity .3s}
+#tgoal i{display:block;height:100%;width:0;background:var(--acc);border-radius:2px;transition:width .5s linear}
+#tsub{height:44px;padding:0 20px;border-radius:22px;background:var(--card);font-size:16px;margin-bottom:3vh;display:flex;align-items:center;gap:6px;position:relative}
+#tsub select{position:absolute;inset:0;opacity:0;max-width:none;width:100%;font-size:16px}
+.btns{display:flex;gap:18px;align-items:center;justify-content:center}
+.big{width:84px;height:84px;border-radius:50%;font-size:16px;font-weight:600;background:var(--acc);color:#000;transition:transform .15s}
+.big:active,.sm:active{transform:scale(.94)}
+.sm{width:84px;height:84px;border-radius:50%;font-size:16px;font-weight:600;background:rgba(255,255,255,.14);transition:transform .15s}
+.sm.end{color:var(--bad)}
+@media(orientation:landscape) and (max-height:500px){#v-timer{padding-bottom:calc(var(--b) + 56px)}#tel{font-size:min(24vh,16vw);margin:0}#tgoal{margin-bottom:1vh}#tsub{height:38px;margin-bottom:1.5vh}.btns{gap:14px}.big,.sm{width:60px;height:60px;font-size:15px}}
+/* log */
+.total{font-size:56px;font-weight:200;letter-spacing:-.02em;line-height:1.1}
+.chart{display:flex;align-items:flex-end;gap:6px;height:130px;padding:12px 14px 0}
+.chart div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:6px;font-size:11px;color:var(--mid)}
+.chart i{display:block;width:100%;max-width:28px;min-height:3px;border-radius:5px 5px 2px 2px;background:var(--dim);transition:height .5s}
+.chart .t i{background:var(--acc)}
+.chart.m{gap:2px}.chart.m div{font-size:0}.chart.m i{border-radius:2px}
+.bar{height:5px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+#toast{position:fixed;left:50%;top:calc(var(--t) + 12px);transform:translate(-50%,-80px);background:#2c2c2e;padding:12px 18px;border-radius:14px;font-size:14px;z-index:20;transition:transform .35s;max-width:90vw;border:.5px solid var(--line)}
+#toast.on{transform:translate(-50%,0)}
+.x{width:44px;height:44px;margin:-6px -12px -6px 0;color:var(--mid)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<section class="view on" id="v-clock">
+  <div id="time" class="num"><span id="hm">--:--</span><span id="sec">00</span></div>
+  <div id="date"></div>
+  <div id="today"></div>
+  <button id="quick">勉強を始める</button>
+</section>
+
+<section class="view" id="v-timer">
+  <div id="tstate">待機中</div>
+  <div id="tel" class="num">00:00:00</div>
+  <div id="tgoal"><i></i></div>
+  <button id="tsub"><span id="tsubl"></span><span class="mid">⌄</span><select id="tsubs" aria-label="教科"></select></button>
+  <div class="btns" id="tbtns"></div>
+</section>
+
+<section class="view" id="v-log">
+  <h1>学習記録</h1>
+  <div class="seg" id="range"><button data-r="1" class="on">今日</button><button data-r="7">過去7日間</button><button data-r="30">過去30日間</button></div>
+  <div class="total num" id="ltotal"></div>
+  <div class="mid" id="lsub" style="margin-bottom:14px;font-size:14px"></div>
+  <div class="card"><div class="chart" id="chart"></div></div>
+  <h2>教科別</h2><div class="card" id="bysub"></div>
+  <h2>セッション</h2><div class="card" id="recs"></div>
+</section>
+
+<section class="view" id="v-set">
+  <h1>設定</h1>
+  <div class="card">
+    <button class="row" data-tg="sec"><span>秒を表示</span><span class="sw" id="sw-sec"></span></button>
+    <label class="row"><span>テーマ</span><select id="theme"><option value="black">ブラック</option><option value="midnight">ミッドナイト</option></select></label>
+    <label class="row"><span>目標時間</span><select id="goal"><option value="0">なし</option><option value="30">30分</option><option value="60">1時間</option><option value="90">1時間30分</option><option value="120">2時間</option><option value="180">3時間</option></select></label>
+  </div>
+  <h2>画面</h2>
+  <div class="card">
+    <button class="row" data-tg="wake"><span>画面を点灯したままにする<small id="wakeinfo"></small></span><span class="sw" id="sw-wake"></span></button>
+  </div>
+  <h2>教科</h2><div class="card" id="subs"></div>
+  <h2>データ</h2>
+  <div class="card">
+    <button class="row" id="exp"><span>記録を書き出す</span><span class="mid">JSON</span></button>
+    <label class="row"><span>バックアップから復元</span><span class="mid">選択</span><input type="file" id="imp" accept="application/json,.json" hidden></label>
+    <button class="row" id="clr"><span class="bad">すべての記録を削除</span></button>
+  </div>
+  <p class="mid" style="font-size:12.5px;line-height:1.6;margin:10px 6px">記録と設定はこの端末のブラウザ内にのみ保存され、外部へは送信されません。ブラウザのサイトデータを消去すると記録も失われます。定期的に書き出してバックアップしてください。</p>
+</section>
+
+<nav id="nav"><button data-v="clock" class="on">時計</button><button data-v="timer">タイマー</button><button data-v="log">記録</button><button data-v="set">設定</button></nav>
+<div id="toast" role="status"></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const DEF={sec:true,theme:'black',goal:0,wake:false,subjects:['国語','数学','英語','理科','社会','その他'],sel:'数学'};
+const toastEl=$('#toast');let tt;
+const toast=m=>{toastEl.textContent=m;toastEl.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>toastEl.classList.remove('on'),3200)};
+const load=(k,d)=>{try{const v=localStorage.getItem('sc.'+k);return v?JSON.parse(v):d}catch(e){return d}};
+const save=(k,v)=>{try{localStorage.setItem('sc.'+k,JSON.stringify(v));return true}catch(e){toast('保存できませんでした。ブラウザの保存設定や空き容量を確認してください');return false}};
+let S=Object.assign({},DEF,load('settings',{}));
+if(!Array.isArray(S.subjects)||!S.subjects.length)S.subjects=DEF.subjects.slice();
+const okRec=r=>r&&Array.isArray(r.segs)&&r.segs.every(g=>Array.isArray(g)&&isFinite(g[0])&&isFinite(g[1]));
+let R=load('records',[]);R=Array.isArray(R)?R.filter(okRec):[];
+let T=load('timer',null);if(T&&!(Array.isArray(T.segs)&&T.segs.length))T=null;
+const pad=n=>String(n).padStart(2,'0');
+const fmt=ms=>{const s=Math.floor(ms/1000);return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60)};
+const fmtH=ms=>{if(ms>0&&ms<60000)return Math.max(1,Math.round(ms/1000))+'秒';const m=Math.round(ms/60000);return m<60?m+'分':Math.floor(m/60)+'時間'+(m%60?pad(m%60)+'分':'')};
+const dayStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
+const addDays=(t,n)=>{const d=new Date(t);d.setDate(d.getDate()+n);return d.getTime()};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* 区間を日付ごとに分割して集計(日またぎ・一時停止対応) */
+function overlap(segs,a,b){let t=0;for(const [x,y] of segs){const s=Math.max(x,a),e=Math.min(y,b);if(e>s)t+=e-s}return t}
+function dayMs(d0,now){const d1=addDays(d0,1);let t=0;for(const r of R)t+=overlap(r.segs,d0,d1);if(T)t+=overlap(segsOf(T,now),d0,d1);return t}
+const segsOf=(t,now)=>t.segs.map(g=>[g[0],g[1]==null?now:g[1]]);
+const elapsed=(t,now)=>segsOf(t,now).reduce((a,[x,y])=>a+Math.max(0,y-x),0);
+const running=t=>t&&t.segs[t.segs.length-1][1]==null;
+
+function apply(){document.documentElement.dataset.theme=S.theme;$('#v-clock').classList.toggle('nosec',!S.sec);
+ $('#sw-sec').classList.toggle('on',S.sec);$('#sw-wake').classList.toggle('on',S.wake);$('#theme').value=S.theme;$('#goal').value=String(S.goal);
+ document.querySelector('meta[name=theme-color]').content=S.theme==='midnight'?'#0a0e17':'#000'}
+const setS=()=>save('settings',S);
+
+/* 画面切替 */
+let cur='clock';
+function go(v){cur=v;$$('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+ if(v!=='clock')document.body.classList.remove('hide');if(v==='log')renderLog();if(v==='set')renderSet();tick(true)}
+$$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+$('#quick').onclick=e=>{e.stopPropagation();if(!T)startT();else if(!running(T))resume();go('timer')};
+$('#v-clock').onclick=()=>document.body.classList.toggle('hide');
+
+/* 時計 */
+const WD=['日','月','火','水','木','金','土'];
+const last={};const put=(id,v)=>{if(last[id]!==v){last[id]=v;$('#'+id).textContent=v}};
+function tick(force){const n=new Date(),now=n.getTime();
+ put('hm',pad(n.getHours())+':'+pad(n.getMinutes()));put('sec',pad(n.getSeconds()));
+ put('date',`${n.getMonth()+1}月${n.getDate()}日 ${WD[n.getDay()]}曜日`);
+ if(cur==='clock'){const m=Math.floor(dayMs(dayStart(now),now)/60000);const k='today'+m;if(last.td!==k||force){last.td=k;$('#today').innerHTML=m>0?`今日 <b class="num">${fmtH(m*60000)}</b>`:'今日はまだ記録がありません';$('#quick').textContent=T?(running(T)?'タイマーを見る':'再開する'):'勉強を始める'}}
+ if(cur==='timer')renderTimer(now)}
+function renderTimer(now){const e=T?elapsed(T,now):0;put('tel',fmt(e));
+ const st=!T?'待機中':running(T)?'計測中':'一時停止中';put('tstate',st);$('#tstate').className=running(T)?'run':'';
+ const g=S.goal*60000,gb=$('#tgoal');gb.style.opacity=g?1:0;if(g)gb.firstChild.style.width=Math.min(100,e/g*100)+'%'}
+function renderBtns(){const b=$('#tbtns');
+ const mk=(c,t,f)=>{const x=document.createElement('button');x.className=c;x.textContent=t;x.onclick=f;return x};
+ b.replaceChildren();
+ if(!T)b.append(mk('big','開始',startT));
+ else if(running(T))b.append(mk('sm','一時停止',pause),mk('sm end','終了',finish));
+ else b.append(mk('big','再開',resume),mk('sm end','終了',finish));
+ $('#tsub').style.visibility='visible';$('#tsubl').textContent=(T?T.sub:S.sel);$('#tsubs').value=T?T.sub:S.sel;$('#tsubs').disabled=false}
+function fillSubs(){const L=T&&!S.subjects.includes(T.sub)?S.subjects.concat(T.sub):S.subjects;$('#tsubs').innerHTML=L.map(s=>`<option>${esc(s)}</option>`).join('');if(!S.subjects.includes(S.sel))S.sel=S.subjects[0]}
+$('#tsubs').onchange=e=>{if(T){T.sub=e.target.value;save('timer',T)}else{S.sel=e.target.value;setS()}renderBtns()};
+function startT(){T={sub:S.sel,segs:[[Date.now(),null]]};save('timer',T);renderBtns();tick(true);wake()}
+function pause(){T.segs[T.segs.length-1][1]=Date.now();save('timer',T);renderBtns();tick(true)}
+function resume(){T.segs.push([Date.now(),null]);save('timer',T);renderBtns();tick(true)}
+function finish(){const now=Date.now();if(running(T))T.segs[T.segs.length-1][1]=now;const dur=elapsed(T,now);
+ if(dur<1000){T=null;save('timer',null);toast('1秒未満のため記録しませんでした')}
+ else{R.push({id:now,sub:T.sub,segs:T.segs,dur});if(save('records',R))toast(`${fmtH(dur)}を記録しました`);T=null;save('timer',null)}
+ renderBtns();tick(true);release()}
+
+/* 記録 */
+let range=load('range',1);
+$('#range').onclick=e=>{const r=e.target.dataset.r;if(!r)return;range=+r;save('range',range);renderLog()};
+function renderLog(){const now=Date.now(),d0=dayStart(now);
+ $$('#range button').forEach(b=>b.classList.toggle('on',+b.dataset.r===range));
+ const from=addDays(d0,-(range-1));const days=[];for(let i=0;i<range;i++){const s=addDays(from,i);days.push([s,dayMs(s,now)])}
+ const tot=days.reduce((a,x)=>a+x[1],0);
+ $('#ltotal').textContent=tot?fmtH(tot):'0分';
+ $('#lsub').textContent=range===1?'今日の学習時間':`1日平均 ${fmtH(tot/range)}`;
+ const mx=Math.max(...days.map(x=>x[1]),1);const ch=$('#chart');ch.className='chart'+(range>7?' m':'');
+ ch.innerHTML=days.map(([s,v],i)=>`<div class="${i===range-1?'t':''}"><i style="height:${Math.max(3,v/mx*88)}px"></i><span>${range>7?'':WD[new Date(s).getDay()]}</span></div>`).join('');
+ const by={};const all=R.slice();if(T)all.push({sub:T.sub,segs:segsOf(T,now)});
+ for(const r of all){const t=overlap(r.segs,from,addDays(d0,1));if(t)by[r.sub]=(by[r.sub]||0)+t}
+ const ent=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+ $('#bysub').innerHTML=ent.length?ent.map(([k,v])=>`<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><span>${esc(k)}</span><span class="mid num">${fmtH(v)}</span></div><div class="bar"><i style="width:${v/ent[0][1]*100}%"></i></div></div>`).join(''):'<div class="empty">この期間の記録はありません。<br><button class="link" onclick="document.querySelector(\'#nav [data-v=timer]\').click()">タイマーを開始する</button></div>';
+ const list=R.filter(r=>overlap(r.segs,from,addDays(d0,1))>0).sort((a,b)=>b.id-a.id).slice(0,50);
+ $('#recs').innerHTML=list.length?list.map(r=>{const a=new Date(r.segs[0][0]),b=new Date(r.segs[r.segs.length-1][1]);
+  return `<div class="row"><span>${esc(r.sub)}<small class="num">${a.getMonth()+1}/${a.getDate()} ${pad(a.getHours())}:${pad(a.getMinutes())}–${pad(b.getHours())}:${pad(b.getMinutes())}</small></span><span class="mid num">${fmtH(r.dur)}</span><button class="x" data-del="${r.id}" aria-label="削除">✕</button></div>`}).join(''):'<div class="empty">まだセッションがありません</div>'}
+$('#recs').onclick=e=>{const id=e.target.dataset.del;if(!id||!confirm('この記録を削除しますか?'))return;R=R.filter(r=>String(r.id)!==id);save('records',R);renderLog()};
+
+/* 設定 */
+function renderSet(){apply();$('#subs').innerHTML=S.subjects.map((s,i)=>`<div class="row"><button style="flex:1;text-align:left;min-height:44px" data-ren="${i}">${esc(s)}</button><button class="x" data-rm="${i}" aria-label="削除">✕</button></div>`).join('')+'<button class="row link" id="addsub">教科を追加</button>';
+ const wl='wakeLock' in navigator;$('#wakeinfo').textContent=wl?'対応ブラウザで有効です。端末の低電力モードなどでは解除されることがあります。':'このブラウザは非対応です。iOSの設定「画面表示と明るさ→自動ロック」を「なし」にしてください。'}
+$('#v-set').onclick=e=>{const t=e.target.closest('[data-tg]');if(t){S[t.dataset.tg]=!S[t.dataset.tg];setS();apply();if(t.dataset.tg==='wake')S.wake?wake(true):release();return}
+ const d=e.target.dataset;
+ if(d.ren!==undefined){const n=prompt('教科名',S.subjects[d.ren]);if(n&&n.trim()){const o=S.subjects[d.ren],v=n.trim().slice(0,12);if(S.subjects.some((s,i)=>s===v&&i!=d.ren))return toast('同じ名前の教科があります');S.subjects[d.ren]=v;R.forEach(r=>{if(r.sub===o)r.sub=v});if(T&&T.sub===o)T.sub=v;if(S.sel===o)S.sel=v;setS();save('records',R);T&&save('timer',T);fillSubs();renderSet();renderBtns()}}
+ if(d.rm!==undefined){if(S.subjects.length<2)return toast('教科は1つ以上必要です');if(!confirm(`「${S.subjects[d.rm]}」を一覧から外しますか?過去の記録は残ります。`))return;S.subjects.splice(d.rm,1);setS();fillSubs();renderSet();renderBtns()}
+ if(e.target.id==='addsub'){const n=prompt('新しい教科名');const v=n&&n.trim().slice(0,12);if(v){if(S.subjects.includes(v))return toast('同じ名前の教科があります');S.subjects.push(v);setS();fillSubs();renderSet()}}};
+$('#theme').onchange=e=>{S.theme=e.target.value;setS();apply()};
+$('#goal').onchange=e=>{S.goal=+e.target.value;setS()};
+$('#exp').onclick=()=>{const blob=new Blob([JSON.stringify({app:'StudyClock',v:1,settings:S,records:R},null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`studyclock-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('書き出しました')};
+$('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const j=JSON.parse(await f.text());if(j.app!=='StudyClock'||!Array.isArray(j.records))throw 0;
+ const rs=j.records.filter(okRec);if(!confirm(`${rs.length}件の記録を読み込みます。現在の記録は置き換えられます。`))return;R=rs;if(j.settings&&Array.isArray(j.settings.subjects)&&j.settings.subjects.length)S=Object.assign({},DEF,j.settings);save('records',R);setS();fillSubs();apply();renderSet();toast('復元しました')}catch(x){toast('このファイルは読み込めません')}};
+$('#clr').onclick=()=>{if(confirm('すべての記録を削除します。元に戻せません。')){R=[];save('records',R);toast('削除しました')}};
+
+/* 画面点灯 */
+let lock=null;
+async function wake(manual){if(!S.wake||!('wakeLock' in navigator)||document.visibilityState!=='visible')return;
+ try{lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>lock=null)}catch(e){if(manual)toast('画面の点灯維持を有効にできませんでした(省電力設定などの影響)')}}
+function release(){if(lock&&!S.wake){lock.release();lock=null}else if(lock&&S.wake===false){lock.release()}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){tick(true);wake()}});
+
+/* 起動 */
+fillSubs();apply();renderBtns();tick(true);
+let iv=setInterval(()=>tick(),250);
+addEventListener('storage',()=>{T=load('timer',null);renderBtns()});
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if(S.wake)document.addEventListener('pointerdown',()=>{if(!lock)wake()},{once:true});
+})();
+</script>
+</body>
+</html>
